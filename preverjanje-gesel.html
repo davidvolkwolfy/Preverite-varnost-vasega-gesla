@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Preverjanje varnosti gesel – SRC d.o.o. Oddelek za kibernetsko varnost.">
+<title>Preverjanje varnosti gesel – SRC</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f81f7'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle'%3E%F0%9F%94%92%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --line:#2a3341;
+    --txt:#e6edf3; --muted:#8b949e; --accent:#2f81f7; --accent2:#1f6feb;
+    --ok:#3fb950; --warn:#d29922; --bad:#f85149; --mid:#db8b2c;
+    --chip:#21262d; --radius:14px; --shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+  :root:not([data-theme="dark"]) @media (prefers-color-scheme: light){}
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#f4f6fb; --panel:#ffffff; --panel2:#f1f5fb; --line:#e2e8f0;
+      --txt:#0f172a; --muted:#5a6b82; --accent:#1f6feb; --accent2:#1552b8;
+      --chip:#eef2f8; --shadow:0 8px 30px rgba(15,23,42,.10);
+    }
+  }
+  :root[data-theme="light"]{
+      --bg:#f4f6fb; --panel:#ffffff; --panel2:#f1f5fb; --line:#e2e8f0;
+      --txt:#0f172a; --muted:#5a6b82; --accent:#1f6feb; --accent2:#1552b8;
+      --chip:#eef2f8; --shadow:0 8px 30px rgba(15,23,42,.10);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:820px; margin:0 auto; padding:24px 16px 64px}
+  header.top{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px}
+  .brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-size:18px}
+  .brand small{display:block; font-weight:500; color:var(--muted); font-size:12px; letter-spacing:.3px}
+  .themebtn{background:var(--chip);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px 12px;cursor:pointer;font-size:13px}
+  h1{font-size:22px; margin:4px 0 6px}
+  .lead{color:var(--muted); font-size:14.5px; margin:0 0 20px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); margin-bottom:18px}
+  label.fieldlabel{font-weight:600; font-size:14px; display:block; margin-bottom:8px}
+  .inputrow{display:flex; gap:8px; align-items:stretch}
+  .pwfield{position:relative; flex:1}
+  input[type=text],input[type=password]{
+    width:100%; padding:14px 92px 14px 14px; font-size:16px; border-radius:12px;
+    border:1px solid var(--line); background:var(--panel2); color:var(--txt); outline:none; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  input:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(47,129,247,.25)}
+  .pwtools{position:absolute; right:8px; top:50%; transform:translateY(-50%); display:flex; gap:2px}
+  .icobtn{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:16px;padding:6px;border-radius:8px}
+  .icobtn:hover{background:var(--chip);color:var(--txt)}
+  .btn{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:12px; padding:0 18px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap}
+  .btn.secondary{background:var(--chip); color:var(--txt); border:1px solid var(--line)}
+  .btn:active{transform:translateY(1px)}
+
+  /* strength bar */
+  .meter{margin-top:18px}
+  .meterbar{height:12px; border-radius:99px; background:var(--chip); overflow:hidden; position:relative}
+  .meterfill{height:100%; width:0%; border-radius:99px; transition:width .35s ease, background .35s ease; background:var(--bad)}
+  .meterhead{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; gap:8px; flex-wrap:wrap}
+  .verdict{font-weight:700; font-size:16px}
+  .verdict small{font-weight:500;color:var(--muted);font-size:12.5px}
+
+  /* crack scenarios */
+  .scen{display:grid; grid-template-columns:1fr; gap:10px; margin-top:16px}
+  .scenrow{display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--panel2); border:1px solid var(--line); border-radius:11px; padding:11px 14px}
+  .scenrow .l{display:flex; align-items:center; gap:10px; min-width:0}
+  .scenrow .ico{font-size:17px}
+  .scenrow .name{font-size:13.5px}
+  .scenrow .name b{display:block; font-size:13.5px}
+  .scenrow .name span{color:var(--muted); font-size:11.5px}
+  .scenrow .time{font-family:ui-monospace,monospace; font-weight:700; font-size:14px; text-align:right; white-space:nowrap}
+
+  /* stats chips */
+  .stats{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px}
+  .chip{background:var(--chip); border:1px solid var(--line); border-radius:99px; padding:6px 12px; font-size:12.5px; color:var(--muted)}
+  .chip b{color:var(--txt)}
+
+  /* checklist */
+  .checks{display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; margin-top:6px}
+  @media(max-width:560px){.checks{grid-template-columns:1fr}}
+  .chk{display:flex; align-items:flex-start; gap:8px; font-size:13.5px; color:var(--muted)}
+  .chk .mark{width:18px;height:18px;border-radius:50%;flex:0 0 18px;display:grid;place-items:center;font-size:11px;border:1.5px solid var(--line); margin-top:1px}
+  .chk.pass{color:var(--txt)}
+  .chk.pass .mark{background:var(--ok);border-color:var(--ok);color:#fff}
+  .chk.fail .mark{color:var(--bad);border-color:var(--bad)}
+
+  /* recommendations */
+  .recs{list-style:none; padding:0; margin:8px 0 0}
+  .recs li{display:flex; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:11px; margin-bottom:8px; background:var(--panel2); font-size:13.5px}
+  .recs li .ic{font-size:16px}
+  .recs li.good{border-color:rgba(63,185,80,.4)}
+  .sectiontitle{font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:20px 0 8px; font-weight:700}
+
+  /* achievements */
+  .ach{display:flex; flex-wrap:wrap; gap:8px}
+  .badge{display:flex; align-items:center; gap:7px; padding:7px 12px; border-radius:99px; font-size:12.5px; border:1px solid var(--line); background:var(--chip); color:var(--muted); opacity:.5; transition:.25s}
+  .badge.on{opacity:1; color:var(--txt); border-color:var(--accent); background:rgba(47,129,247,.12)}
+  .badge .e{font-size:15px}
+
+  /* generator */
+  .genopts{display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin:12px 0}
+  .seg{display:inline-flex; background:var(--chip); border:1px solid var(--line); border-radius:10px; padding:3px}
+  .seg button{background:transparent;border:0;color:var(--muted);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+  .seg button.active{background:var(--accent);color:#fff}
+  .rangewrap{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted)}
+  input[type=range]{accent-color:var(--accent)}
+  .toggle{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none}
+  .genout{display:flex; gap:8px; margin-top:12px}
+  .genout input{font-size:15px}
+  .privacy{display:flex; gap:10px; align-items:center; background:var(--panel2); border:1px solid var(--line); border-radius:11px; padding:11px 14px; font-size:12.5px; color:var(--muted); margin-top:6px}
+  footer{color:var(--muted); font-size:12px; text-align:center; margin-top:26px; line-height:1.7}
+  .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ok); color:#fff; padding:10px 18px; border-radius:10px; font-size:13.5px; opacity:0; pointer-events:none; transition:.3s; z-index:50}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  .hidden{display:none !important}
+  .subtle{color:var(--muted); font-size:12.5px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">🔒</div>
+      <div>SRC · Kibernetska varnost
+        <small>Preverjanje varnosti gesel</small>
+      </div>
+    </div>
+    <button class="themebtn" id="themeBtn" title="Preklopi temo">🌓 Tema</button>
+  </header>
+
+  <h1>Kako varno je vaše geslo?</h1>
+  <p class="lead">Vnesite geslo in v realnem času dobite oceno moči, realističen čas razbitja za različne vrste napadov ter konkretne predloge za izboljšanje. Vse se izračuna <b>lokalno v vašem brskalniku</b> – geslo nikoli ne zapusti te naprave.</p>
+
+  <!-- INPUT CARD -->
+  <div class="card">
+    <label class="fieldlabel" for="pw">Vpišite geslo za analizo</label>
+    <div class="inputrow">
+      <div class="pwfield">
+        <input type="password" id="pw" placeholder="Začnite tipkati…" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <div class="pwtools">
+          <button class="icobtn" id="toggleVis" title="Pokaži / skrij">👁️</button>
+          <button class="icobtn" id="clearBtn" title="Počisti">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- METER -->
+    <div class="meter">
+      <div class="meterhead">
+        <div class="verdict" id="verdict">Vnesite geslo…</div>
+        <div class="subtle" id="verdictSub"></div>
+      </div>
+      <div class="meterbar"><div class="meterfill" id="fill"></div></div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats" id="stats">
+      <span class="chip">Znaki: <b id="sLen">0</b></span>
+      <span class="chip">Male: <b id="sLow">0</b></span>
+      <span class="chip">Velike: <b id="sUp">0</b></span>
+      <span class="chip">Številke: <b id="sNum">0</b></span>
+      <span class="chip">Posebni: <b id="sSpec">0</b></span>
+      <span class="chip">Entropija: <b id="sEnt">0</b> bit</span>
+    </div>
+  </div>
+
+  <!-- CRACK SCENARIOS -->
+  <div class="card" id="scenCard">
+    <div class="sectiontitle">Ocena časa razbitja</div>
+    <p class="subtle" style="margin-top:0">Koliko časa bi napadalec potreboval, da geslo ugane s surovo silo (brute-force), pri realističnih hitrostih strojne opreme. Ocena temelji na entropiji in prepoznanih vzorcih.</p>
+    <div class="scen" id="scen"></div>
+  </div>
+
+  <!-- CHECKLIST + RECS -->
+  <div class="card">
+    <div class="sectiontitle">Kontrolni seznam</div>
+    <div class="checks" id="checks"></div>
+
+    <div class="sectiontitle">Priporočila</div>
+    <ul class="recs" id="recs"><li class="subtle" style="border:0;background:none">Vnesite geslo za predloge.</li></ul>
+
+    <div class="sectiontitle">Dosežki</div>
+    <div class="ach" id="ach"></div>
+  </div>
+
+  <!-- GENERATOR -->
+  <div class="card">
+    <div class="sectiontitle">Generator močnih gesel</div>
+    <div class="seg" id="modeSeg">
+      <button data-mode="password" class="active">Naključno geslo</button>
+      <button data-mode="passphrase">Geslo-fraza</button>
+    </div>
+
+    <div class="genopts">
+      <div class="rangewrap">
+        <span id="lenLabel">Dolžina: 20</span>
+        <input type="range" id="lenRange" min="8" max="40" value="20">
+      </div>
+    </div>
+
+    <div class="genopts" id="pwOpts">
+      <label class="toggle"><input type="checkbox" id="optUpper" checked> Velike (A–Z)</label>
+      <label class="toggle"><input type="checkbox" id="optLower" checked> Male (a–z)</label>
+      <label class="toggle"><input type="checkbox" id="optNum" checked> Številke (0–9)</label>
+      <label class="toggle"><input type="checkbox" id="optSym" checked> Posebni (!@#…)</label>
+      <label class="toggle"><input type="checkbox" id="optAmb"> Izpusti dvoumne (l,1,O,0)</label>
+    </div>
+
+    <div class="genopts hidden" id="phOpts">
+      <div class="rangewrap"><span id="wordsLabel">Besede: 5</span>
+        <input type="range" id="wordsRange" min="3" max="8" value="5"></div>
+      <label class="toggle"><input type="checkbox" id="phCap" checked> Velika začetnica</label>
+      <label class="toggle"><input type="checkbox" id="phNum" checked> Dodaj številko</label>
+    </div>
+
+    <div class="genout">
+      <div class="pwfield" style="flex:1">
+        <input type="text" id="genField" readonly placeholder="Kliknite Ustvari…">
+      </div>
+      <button class="btn secondary" id="genBtn">🔄 Ustvari</button>
+      <button class="btn" id="copyBtn">📋 Kopiraj</button>
+    </div>
+    <div class="privacy">🔐 Generator uporablja kriptografsko varen vir naključja (<code>crypto.getRandomValues</code>) – ne <code>Math.random</code>.</div>
+    <div style="margin-top:10px"><button class="btn secondary" id="useGen">↑ Uporabi zgeneriran za analizo</button></div>
+  </div>
+
+  <footer>
+    🔐 Ta stran ne shranjuje in ne pošilja vaših gesel. Vsa obdelava poteka lokalno v brskalniku.<br>
+    Projekt razvija Oddelek za kibernetsko varnost <b>SRC d.o.o.</b> · Namenjeno ozaveščanju in izobraževanju.
+  </footer>
+</div>
+<div class="toast" id="toast">Kopirano ✓</div>
+
+<script>
+/* ============================================================
+   SRC Password Security Checker – standalone, 100% client-side
+   ============================================================ */
+
+/* ---------- Word/pattern blocklists (compact) ---------- */
+const COMMON = new Set(["geslo","password","passwort","qwerty","asdf","123456","12345678","123456789","1234567890",
+"111111","000000","abc123","admin","welcome","letmein","iloveyou","dragon","monkey","master","login","guest","user",
+"sunshine","princess","football","superman","batman","trustno1","1q2w3e","zaq12wsx","qwertz","slovenija","ljubljana",
+"maribor","triglav","novak","olimpija","doncic","pogacar","roglic","test","pivo","sonce","luna","geslo123","slo123"]);
+const SEQ = ["abcdefghijklmnopqrstuvwxyz","qwertzuiopasdfghjklyxcvbnm","qwertyuiopasdfghjklzxcvbnm","0123456789"];
+const LEET = {a:"@4",e:"3",i:"1!",o:"0",s:"$5",t:"7",l:"1",b:"8",g:"9"};
+
+/* ---------- Character-pool estimation ---------- */
+function poolSize(pw){
+  let s=0;
+  if(/[a-z]/.test(pw)) s+=26;
+  if(/[A-Z]/.test(pw)) s+=26;
+  if(/[0-9]/.test(pw)) s+=10;
+  if(/[^a-zA-Z0-9]/.test(pw)) s+=33; // common printable specials
+  // rough allowance for non-ASCII (šumniki, unicode)
+  if(/[^\x00-\x7F]/.test(pw)) s+=40;
+  return Math.max(s,1);
+}
+
+/* ---------- Pattern penalties -> effective guesses ---------- */
+function normalize(pw){ // leet-reverse to catch masked dictionary words
+  let s=pw.toLowerCase();
+  for(const k in LEET){ for(const ch of LEET[k]) s=s.split(ch).join(k); }
+  return s;
+}
+function hasSequence(pw){
+  const low=pw.toLowerCase();
+  for(const seq of SEQ){
+    for(let i=0;i+3<=seq.length;i++){
+      const frag=seq.slice(i,i+4);
+      if(low.includes(frag)) return true;
+      if(low.includes(frag.split("").reverse().join(""))) return true;
+    }
+  }
+  return false;
+}
+function hasRepeat(pw){ return /(.)\1{2,}/.test(pw); } // aaa, 111
+function looksLikeYear(pw){ return /(19|20)\d{2}/.test(pw); }
+function isDictionary(pw){
+  const n=normalize(pw);
+  if(COMMON.has(n)) return "exact";
+  for(const w of COMMON){ if(w.length>=4 && n.includes(w)) return "contains"; }
+  return null;
+}
+
+/* ---------- Core strength model ----------
+   Base entropy = len * log2(pool). Then subtract for detected weaknesses,
+   producing an "effective entropy" -> guesses = 2^eff. */
+function analyze(pw){
+  const len=pw.length;
+  const counts={
+    lower:(pw.match(/[a-z]/g)||[]).length,
+    upper:(pw.match(/[A-Z]/g)||[]).length,
+    num:(pw.match(/[0-9]/g)||[]).length,
+    spec:(pw.match(/[^a-zA-Z0-9]/g)||[]).length,
+  };
+  const pool=poolSize(pw);
+  let baseEntropy = len>0 ? len*Math.log2(pool) : 0;
+
+  const weaknesses=[];
+  let penalty=0;
+
+  const dict=isDictionary(pw);
+  if(dict==="exact"){ penalty+=baseEntropy*0.85; weaknesses.push("common"); }
+  else if(dict==="contains"){ penalty+=Math.min(baseEntropy*0.35,14); weaknesses.push("dictword"); }
+
+  if(hasSequence(pw)){ penalty+=Math.min(baseEntropy*0.25,10); weaknesses.push("sequence"); }
+  if(hasRepeat(pw)){ penalty+=Math.min(baseEntropy*0.2,8); weaknesses.push("repeat"); }
+  if(looksLikeYear(pw)){ penalty+=4; weaknesses.push("year"); }
+  // keyboard-ish all-lower short
+  if(len>0 && len<8){ penalty+=6; weaknesses.push("short"); }
+  // only one character class
+  const classes=[counts.lower>0,counts.upper>0,counts.num>0,counts.spec>0].filter(Boolean).length;
+  if(classes<=1 && len>0){ penalty+=Math.min(baseEntropy*0.15,6); }
+
+  let eff=Math.max(baseEntropy-penalty, 0);
+  // hard floor for empty
+  if(len===0) eff=0;
+
+  // guesses (assume attacker on average finds it at half the space)
+  const guesses = len? Math.pow(2, eff)/2 : 0;
+
+  // score 0..4 (zxcvbn-like), from effective entropy
+  let score;
+  if(eff<28) score=0;
+  else if(eff<36) score=1;
+  else if(eff<60) score=2;
+  else if(eff<128) score=3;
+  else score=4;
+  if(dict==="exact") score=0;
+
+  return {len,counts,pool,baseEntropy,eff,guesses,score,weaknesses,classes};
+}
+
+/* ---------- Crack-time scenarios ----------
+   Rates = guesses per second for the attacker model. */
+const SCENARIOS=[
+  {key:"online_throttled", ico:"🌐", name:"Spletni napad (omejen)", sub:"npr. prijavni obrazec, ~100/s", rate:100},
+  {key:"online_fast", ico:"⚡", name:"Spletni napad (hiter)", sub:"brez omejitev, ~10 tisoč/s", rate:1e4},
+  {key:"offline_slow", ico:"🖥️", name:"Offline (počasen hash)", sub:"bcrypt/argon2, ~10 tisoč/s", rate:1e4},
+  {key:"offline_gpu", ico:"🎮", name:"Offline GPU (hiter hash)", sub:"MD5/SHA1, ~100 milijard/s", rate:1e11},
+  {key:"offline_farm", ico:"🏭", name:"Napadalec z mnogo GPU", sub:"gruča, ~10 bilijonov/s", rate:1e13},
+];
+function fmtTime(sec){
+  if(sec<1e-3) return "trenutno";
+  if(sec<1) return "manj kot sekunda";
+  const units=[
+    ["stoletij",3155760000],["let",31557600],["mesecev",2629800],
+    ["dni",86400],["ur",3600],["minut",60],["sekund",1]
+  ];
+  if(sec>3155760000*100) {
+    const cent=sec/3155760000;
+    if(cent>1e6) return "praktično nerazbitno";
+    return Math.round(cent).toLocaleString("sl")+" stoletij";
+  }
+  for(const [label,s] of units){
+    if(sec>=s){ const v=Math.floor(sec/s); return v.toLocaleString("sl")+" "+label; }
+  }
+  return "trenutno";
+}
+function timeColor(sec){
+  if(sec<3600) return "var(--bad)";
+  if(sec<86400*30) return "var(--warn)";
+  if(sec<31557600*100) return "var(--mid)";
+  return "var(--ok)";
+}
+
+/* ---------- Checklist ---------- */
+function checklist(a,pw){
+  return [
+    {ok:a.len>=12, label:"Vsaj 12 znakov"},
+    {ok:a.len>=16, label:"16+ znakov (priporočeno)"},
+    {ok:a.counts.upper>0 && a.counts.lower>0, label:"Male in velike črke"},
+    {ok:a.counts.num>0, label:"Vsebuje številke"},
+    {ok:a.counts.spec>0, label:"Vsebuje posebne znake"},
+    {ok:!a.weaknesses.includes("common") && !a.weaknesses.includes("dictword"), label:"Ni v seznamu pogostih gesel"},
+    {ok:!a.weaknesses.includes("sequence") && !a.weaknesses.includes("repeat"), label:"Brez zaporedij / ponavljanj"},
+    {ok:!a.weaknesses.includes("year"), label:"Brez letnic (npr. 1990)"},
+  ];
+}
+
+/* ---------- Recommendations ---------- */
+function recommend(a){
+  if(a.len===0) return [];
+  const r=[];
+  if(a.weaknesses.includes("common")) r.push({ic:"🚨",t:"To je eno najpogostejših gesel na svetu. Napadalec ga preizkusi med prvimi – takoj ga zamenjajte."});
+  if(a.weaknesses.includes("dictword")) r.push({ic:"📖",t:"Geslo vsebuje pogosto besedo iz slovarja (tudi z zamenjavo črk s številkami, npr. @ za a). Napadalci te vzorce poznajo."});
+  if(a.len<12) r.push({ic:"📏",t:"Podaljšajte geslo na vsaj 12–16 znakov. Dolžina prispeva k varnosti bolj kot kompleksnost."});
+  if(a.counts.upper===0||a.counts.lower===0) r.push({ic:"🔠",t:"Mešajte male in velike črke."});
+  if(a.counts.num===0) r.push({ic:"🔢",t:"Dodajte nekaj številk (a ne le na koncu)."});
+  if(a.counts.spec===0) r.push({ic:"✳️",t:"Dodajte posebne znake (npr. ! ? # % &)."});
+  if(a.weaknesses.includes("sequence")) r.push({ic:"➡️",t:"Izogibajte se zaporedjem tipk in črk (abc, 123, qwertz)."});
+  if(a.weaknesses.includes("repeat")) r.push({ic:"🔁",t:"Izogibajte se ponavljajočim se znakom (aaa, 111)."});
+  if(a.weaknesses.includes("year")) r.push({ic:"📅",t:"Ne uporabljajte letnic, rojstnih datumov ali osebnih podatkov."});
+  if(r.length===0){
+    r.push({ic:"✅",t:"Odlično – to je močno geslo.",good:true});
+    r.push({ic:"🗝️",t:"Za maksimalno varnost uporabite upravitelja gesel in za vsak račun drugačno geslo.",good:true});
+    r.push({ic:"📱",t:"Kjer je mogoče, vklopite dvostopenjsko avtentikacijo (2FA).",good:true});
+  } else {
+    r.push({ic:"💡",t:"Namig: geslo-fraza iz več naključnih besed (npr. »konj-baterija-modra-postelja«) je enostavna za pomnjenje in zelo močna. Uporabite generator spodaj.",good:true});
+  }
+  return r;
+}
+
+/* ---------- Achievements ---------- */
+const BADGES=[
+  {id:"len12", e:"📏", t:"12+ znakov", test:a=>a.len>=12},
+  {id:"len20", e:"📐", t:"20+ znakov", test:a=>a.len>=20},
+  {id:"allclass", e:"🎨", t:"Vse vrste znakov", test:a=>a.classes===4},
+  {id:"nodict", e:"🛡️", t:"Ni slovarsko", test:a=>a.len>0 && !a.weaknesses.includes("common") && !a.weaknesses.includes("dictword")},
+  {id:"entropy", e:"🔥", t:"80+ bitov entropije", test:a=>a.eff>=80},
+  {id:"fortress", e:"🏰", t:"Trdnjava (ocena 4)", test:a=>a.score===4},
+];
+
+/* ---------- Rendering ---------- */
+const $=id=>document.getElementById(id);
+const VERDICTS=[
+  {t:"Zelo šibko",c:"var(--bad)"},
+  {t:"Šibko",c:"var(--bad)"},
+  {t:"Zmerno",c:"var(--warn)"},
+  {t:"Močno",c:"var(--mid)"},
+  {t:"Zelo močno",c:"var(--ok)"},
+];
+
+function render(pw){
+  const a=analyze(pw);
+  $("sLen").textContent=a.len;
+  $("sLow").textContent=a.counts.lower;
+  $("sUp").textContent=a.counts.upper;
+  $("sNum").textContent=a.counts.num;
+  $("sSpec").textContent=a.counts.spec;
+  $("sEnt").textContent=Math.round(a.eff);
+
+  const v=VERDICTS[a.score];
+  const fill=$("fill");
+  fill.style.width=(a.len? (a.score+1)*20 : 0)+"%";
+  fill.style.background=v.c;
+  if(a.len===0){ $("verdict").textContent="Vnesite geslo…"; $("verdict").style.color="var(--muted)"; $("verdictSub").textContent=""; }
+  else { $("verdict").textContent=v.t; $("verdict").style.color=v.c;
+         $("verdictSub").textContent="ocena "+a.score+"/4 · ~"+Math.round(a.eff)+" bitov"; }
+
+  // scenarios
+  const scen=$("scen"); scen.innerHTML="";
+  if(a.len===0){
+    scen.innerHTML='<div class="subtle">Vnesite geslo za oceno časa razbitja.</div>';
+  } else {
+    for(const s of SCENARIOS){
+      const sec=a.guesses/s.rate;
+      const row=document.createElement("div");
+      row.className="scenrow";
+      row.innerHTML=`<div class="l"><span class="ico">${s.ico}</span>
+        <span class="name"><b>${s.name}</b><span>${s.sub}</span></span></div>
+        <span class="time" style="color:${timeColor(sec)}">${fmtTime(sec)}</span>`;
+      scen.appendChild(row);
+    }
+  }
+
+  // checklist
+  const cl=checklist(a,pw); const cbox=$("checks"); cbox.innerHTML="";
+  for(const c of cl){
+    const d=document.createElement("div");
+    d.className="chk "+(c.ok?"pass":(a.len?"fail":""));
+    d.innerHTML=`<span class="mark">${c.ok?"✓":(a.len?"✕":"")}</span><span>${c.label}</span>`;
+    cbox.appendChild(d);
+  }
+
+  // recs
+  const recs=recommend(a); const rbox=$("recs"); rbox.innerHTML="";
+  if(recs.length===0){ rbox.innerHTML='<li class="subtle" style="border:0;background:none">Vnesite geslo za predloge.</li>'; }
+  for(const r of recs){
+    const li=document.createElement("li"); if(r.good) li.className="good";
+    li.innerHTML=`<span class="ic">${r.ic}</span><span>${r.t}</span>`;
+    rbox.appendChild(li);
+  }
+
+  // achievements
+  const abox=$("ach"); abox.innerHTML="";
+  for(const b of BADGES){
+    const on=a.len>0 && b.test(a);
+    const d=document.createElement("div");
+    d.className="badge "+(on?"on":"");
+    d.innerHTML=`<span class="e">${b.e}</span><span>${b.t}</span>`;
+    abox.appendChild(d);
+  }
+}
+
+/* ---------- Generator (crypto-secure) ---------- */
+function secureInt(max){ // uniform [0,max)
+  const arr=new Uint32Array(1); const limit=Math.floor(4294967296/max)*max;
+  let x; do{ crypto.getRandomValues(arr); x=arr[0]; }while(x>=limit);
+  return x%max;
+}
+function pick(str){ return str[secureInt(str.length)]; }
+function genPassword(){
+  const len=+$("lenRange").value;
+  let sets=[];
+  const amb=$("optAmb").checked;
+  let U="ABCDEFGHIJKLMNOPQRSTUVWXYZ", L="abcdefghijklmnopqrstuvwxyz", N="0123456789", S="!@#$%^&*-_=+?";
+  if(amb){ U=U.replace(/[IO]/g,""); L=L.replace(/[lo]/g,""); N=N.replace(/[01]/g,""); }
+  if($("optUpper").checked) sets.push(U);
+  if($("optLower").checked) sets.push(L);
+  if($("optNum").checked) sets.push(N);
+  if($("optSym").checked) sets.push(S);
+  if(sets.length===0) sets.push(L);
+  const all=sets.join("");
+  let out=[];
+  // guarantee at least one from each chosen set
+  for(const s of sets) out.push(pick(s));
+  while(out.length<len) out.push(pick(all));
+  // Fisher-Yates shuffle
+  for(let i=out.length-1;i>0;i--){ const j=secureInt(i+1); [out[i],out[j]]=[out[j],out[i]]; }
+  return out.slice(0,len).join("");
+}
+const WORDS=["jabolko","gora","reka","modra","postelja","konj","baterija","oblak","zvezda","kamen","veter","ogenj",
+"snops","lisica","hrast","zvon","most","luna","sonce","srce","kolo","knjiga","kava","dežnik","gozd","morje","pesek",
+"tiger","riba","ptica","cvet","list","koren","zima","poletje","sever","jug","mesec","polje","hiša","vrata","okno",
+"ura","zemlja","nebo","dolina","otok","jezero","slap","mavrica","kompas","sidro","perje","meglá","iskra","valj"];
+function genPassphrase(){
+  const n=+$("wordsRange").value;
+  const cap=$("phCap").checked, num=$("phNum").checked;
+  let words=[];
+  for(let i=0;i<n;i++){
+    let w=WORDS[secureInt(WORDS.length)];
+    if(cap) w=w.charAt(0).toUpperCase()+w.slice(1);
+    words.push(w);
+  }
+  let out=words.join("-");
+  if(num) out+="-"+secureInt(100);
+  return out;
+}
+let genMode="password";
+function generate(){
+  const val=genMode==="password"?genPassword():genPassphrase();
+  $("genField").value=val;
+  return val;
+}
+
+/* ---------- Events ---------- */
+$("pw").addEventListener("input",e=>render(e.target.value));
+$("toggleVis").addEventListener("click",()=>{
+  const f=$("pw"); f.type=f.type==="password"?"text":"password";
+});
+$("clearBtn").addEventListener("click",()=>{ $("pw").value=""; render(""); $("pw").focus(); });
+
+$("lenRange").addEventListener("input",e=>$("lenLabel").textContent="Dolžina: "+e.target.value);
+$("wordsRange").addEventListener("input",e=>$("wordsLabel").textContent="Besede: "+e.target.value);
+document.querySelectorAll("#modeSeg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#modeSeg button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); genMode=b.dataset.mode;
+  $("pwOpts").classList.toggle("hidden",genMode!=="password");
+  $("phOpts").classList.toggle("hidden",genMode!=="passphrase");
+}));
+$("genBtn").addEventListener("click",generate);
+$("copyBtn").addEventListener("click",async()=>{
+  const v=$("genField").value||generate();
+  try{ await navigator.clipboard.writeText(v); toast("Kopirano ✓"); }
+  catch{ $("genField").select(); document.execCommand("copy"); toast("Kopirano ✓"); }
+});
+$("useGen").addEventListener("click",()=>{
+  const v=$("genField").value||generate();
+  $("pw").value=v; $("pw").type="text"; render(v);
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1600); }
+
+// theme toggle
+$("themeBtn").addEventListener("click",()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const next = cur==="light"?"dark":(cur==="dark"?"light":"light");
+  document.documentElement.setAttribute("data-theme",next);
+  try{ localStorage.setItem("src_pw_theme",next); }catch{}
+});
+try{ const saved=localStorage.getItem("src_pw_theme"); if(saved) document.documentElement.setAttribute("data-theme",saved); }catch{}
+
+// init
+render("");
+generate();
+</script>
+</body>
+</html>
